@@ -53,7 +53,7 @@ export async function getUserVaultRole(userId: number, vaultId: string): Promise
     db.get(
       'SELECT role FROM vault_members WHERE user_id = ? AND vault_id = ?',
       [userId, vaultId],
-      (err, row: { role: VaultRole } | undefined) => {
+      (err: Error | null, row: { role: VaultRole } | undefined) => {
         if (err) {
           reject(err);
         } else {
@@ -198,7 +198,7 @@ export async function addMember(
     db.run(
       'INSERT INTO vault_members (vault_id, user_id, role, added_by) VALUES (?, ?, ?, ?)',
       [vaultId, userId, role, addedBy],
-      function(err) {
+      function(err: Error | null) {
         if (err) {
           if (err.message.includes('UNIQUE constraint failed')) {
             resolve({ success: false, error: 'User is already a member of this vault' });
@@ -245,7 +245,7 @@ export async function removeMember(
     db.run(
       'DELETE FROM vault_members WHERE vault_id = ? AND user_id = ?',
       [vaultId, userId],
-      function(err) {
+      function(this: { changes: number }, err: Error | null) {
         if (err) {
           console.error('Error removing vault member:', err);
           resolve({ success: false, error: 'Database error' });
@@ -302,7 +302,7 @@ export async function updateMemberRole(
     db.run(
       'UPDATE vault_members SET role = ? WHERE vault_id = ? AND user_id = ?',
       [newRole, vaultId, userId],
-      function(err) {
+      function(this: { changes: number }, err: Error | null) {
         if (err) {
           console.error('Error updating vault member role:', err);
           resolve({ success: false, error: 'Database error' });
@@ -357,7 +357,7 @@ export async function transferOwnership(
       db.run(
         'UPDATE vault_members SET role = ? WHERE vault_id = ? AND user_id = ?',
         ['admin', vaultId, currentOwnerId],
-        function(err) {
+        function(err: Error | null) {
           if (err) {
             db.run('ROLLBACK');
             console.error('Error demoting current owner:', err);
@@ -369,7 +369,7 @@ export async function transferOwnership(
           db.run(
             'UPDATE vault_members SET role = ? WHERE vault_id = ? AND user_id = ?',
             ['owner', vaultId, newOwnerId],
-            function(err) {
+            function(err: Error | null) {
               if (err) {
                 db.run('ROLLBACK');
                 console.error('Error promoting new owner:', err);
@@ -377,7 +377,7 @@ export async function transferOwnership(
                 return;
               }
               
-              db.run('COMMIT', (err) => {
+              db.run('COMMIT', (err: Error | null) => {
                 if (err) {
                   db.run('ROLLBACK');
                   console.error('Error committing ownership transfer:', err);
@@ -427,7 +427,7 @@ export async function getVaultMembers(vaultId: string): Promise<VaultMember[]> {
         END,
         vm.created_at ASC`,
       [vaultId],
-      (err, rows) => {
+      (err: Error | null, rows: VaultMember[]) => {
         if (err) {
           reject(err);
         } else {
@@ -450,7 +450,7 @@ export async function getUserVaults(userId: number): Promise<Array<{ vault_id: s
     db.all(
       'SELECT vault_id, role FROM vault_members WHERE user_id = ? ORDER BY created_at DESC',
       [userId],
-      (err, rows) => {
+      (err: Error | null, rows: Array<{ vault_id: string; role: VaultRole }>) => {
         if (err) {
           reject(err);
         } else {
@@ -473,7 +473,7 @@ export async function getVaultOwner(vaultId: string): Promise<number | null> {
     db.get(
       'SELECT user_id FROM vault_members WHERE vault_id = ? AND role = ?',
       [vaultId, 'owner'],
-      (err, row: { user_id: number } | undefined) => {
+      (err: Error | null, row: { user_id: number } | undefined) => {
         if (err) {
           reject(err);
         } else {
@@ -496,7 +496,7 @@ export async function vaultHasMembers(vaultId: string): Promise<boolean> {
     db.get(
       'SELECT COUNT(*) as count FROM vault_members WHERE vault_id = ?',
       [vaultId],
-      (err, row: { count: number } | undefined) => {
+      (err: Error | null, row: { count: number } | undefined) => {
         if (err) {
           reject(err);
         } else {
@@ -530,14 +530,14 @@ export async function setVaultOwner(
     db.run(
       'INSERT INTO vault_members (vault_id, user_id, role, added_by) VALUES (?, ?, ?, ?)',
       [vaultId, userId, 'owner', null],
-      function(err) {
+      function(err: Error | null) {
         if (err) {
           if (err.message.includes('UNIQUE constraint failed')) {
             // User is already a member, update their role to owner
             db.run(
               'UPDATE vault_members SET role = ? WHERE vault_id = ? AND user_id = ?',
               ['owner', vaultId, userId],
-              function(err) {
+              function(err: Error | null) {
                 if (err) {
                   console.error('Error setting vault owner:', err);
                   resolve({ success: false, error: 'Database error' });
@@ -571,7 +571,7 @@ export async function deleteAllVaultMembers(vaultId: string): Promise<void> {
     db.run(
       'DELETE FROM vault_members WHERE vault_id = ?',
       [vaultId],
-      function(err) {
+      function(err: Error | null) {
         if (err) {
           reject(err);
         } else {

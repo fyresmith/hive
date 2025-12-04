@@ -97,7 +97,7 @@ export async function initializeDatabase(): Promise<void> {
   return new Promise((resolve, reject) => {
     const dbPath = path.resolve(DATABASE_PATH);
     
-    db = new sqlite3.Database(dbPath, (err) => {
+    db = new sqlite3.Database(dbPath, (err: Error | null) => {
       if (err) {
         console.error('Failed to connect to database:', err);
         reject(err);
@@ -107,7 +107,7 @@ export async function initializeDatabase(): Promise<void> {
       console.log('Connected to SQLite database at:', dbPath);
       
       // Enable WAL mode for better crash safety and concurrent read performance
-      db.run('PRAGMA journal_mode=WAL', (err) => {
+      db.run('PRAGMA journal_mode=WAL', (err: Error | null) => {
         if (err) {
           console.warn('Failed to enable WAL mode:', err);
         } else {
@@ -116,7 +116,7 @@ export async function initializeDatabase(): Promise<void> {
       });
       
       // Set synchronous to NORMAL for better performance while maintaining safety with WAL
-      db.run('PRAGMA synchronous=NORMAL', (err) => {
+      db.run('PRAGMA synchronous=NORMAL', (err: Error | null) => {
         if (err) {
           console.warn('Failed to set synchronous mode:', err);
         }
@@ -131,7 +131,7 @@ export async function initializeDatabase(): Promise<void> {
           is_admin INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-      `, (err) => {
+      `, (err: Error | null) => {
         if (err) {
           console.error('Failed to create users table:', err);
           reject(err);
@@ -156,7 +156,7 @@ export async function initializeDatabase(): Promise<void> {
             status TEXT DEFAULT 'pending',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )
-        `, (err) => {
+        `, (err: Error | null) => {
           if (err) {
             console.error('Failed to create access_requests table:', err);
             reject(err);
@@ -183,7 +183,7 @@ export async function initializeDatabase(): Promise<void> {
               FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
               FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE SET NULL
             )
-          `, (err) => {
+          `, (err: Error | null) => {
             if (err) {
               console.error('Failed to create vault_members table:', err);
               reject(err);
@@ -222,7 +222,7 @@ export async function registerUser(username: string, password: string): Promise<
       const passwordHash = await bcrypt.hash(password, 10);
       
       // Check if this is the first user (make them admin)
-      db.get('SELECT COUNT(*) as count FROM users', [], (err, row: { count: number } | undefined) => {
+      db.get('SELECT COUNT(*) as count FROM users', [], (err: Error | null, row: { count: number } | undefined) => {
         if (err) {
           reject(err);
           return;
@@ -234,7 +234,7 @@ export async function registerUser(username: string, password: string): Promise<
         db.run(
           'INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)',
           [username, passwordHash, isAdmin],
-          function(err) {
+          function(this: sqlite3.RunResult, err: Error | null) {
             if (err) {
               if (err.message.includes('UNIQUE constraint failed')) {
                 resolve(false); // Username already exists
@@ -266,7 +266,7 @@ export async function loginUser(username: string, password: string): Promise<str
     db.get(
       'SELECT id, username, password_hash, is_admin FROM users WHERE username = ?',
       [username],
-      async (err, row: { id: number; username: string; password_hash: string; is_admin: number } | undefined) => {
+      async (err: Error | null, row: { id: number; username: string; password_hash: string; is_admin: number } | undefined) => {
         if (err) {
           reject(err);
           return;
@@ -411,7 +411,7 @@ export async function createAccessRequest(
       db.run(
         'INSERT INTO access_requests (username, email, message, password_hash, status) VALUES (?, ?, ?, ?, ?)',
         [username, email, message || null, passwordHash, 'pending'],
-        function(err) {
+        function(this: sqlite3.RunResult, err: Error | null) {
           if (err) {
             reject(err);
           } else {
@@ -434,7 +434,7 @@ export async function getPendingAccessRequests(): Promise<AccessRequest[]> {
     db.all(
       'SELECT * FROM access_requests WHERE status = ? ORDER BY created_at DESC',
       ['pending'],
-      (err, rows) => {
+      (err: Error | null, rows: AccessRequest[]) => {
         if (err) {
           reject(err);
         } else {
@@ -453,7 +453,7 @@ export async function rejectAccessRequest(id: number): Promise<boolean> {
     db.run(
       'UPDATE access_requests SET status = ? WHERE id = ?',
       ['rejected', id],
-      function(err) {
+      function(this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else {
@@ -474,7 +474,7 @@ export async function approveAccessRequest(id: number): Promise<{ success: boole
     db.get(
       'SELECT * FROM access_requests WHERE id = ? AND status = ?',
       [id, 'pending'],
-      async (err, row: AccessRequest | undefined) => {
+      async (err: Error | null, row: AccessRequest | undefined) => {
         if (err) {
           reject(err);
           return;
@@ -494,7 +494,7 @@ export async function approveAccessRequest(id: number): Promise<{ success: boole
         db.get(
           'SELECT id FROM users WHERE username = ?',
           [row.username],
-          async (err, existingUser) => {
+          async (err: Error | null, existingUser: { id: number } | undefined) => {
             if (err) {
               reject(err);
               return;
@@ -509,7 +509,7 @@ export async function approveAccessRequest(id: number): Promise<{ success: boole
             db.run(
               'INSERT INTO users (username, password_hash) VALUES (?, ?)',
               [row.username, row.password_hash],
-              function(err) {
+              function(this: sqlite3.RunResult, err: Error | null) {
                 if (err) {
                   reject(err);
                   return;
@@ -522,7 +522,7 @@ export async function approveAccessRequest(id: number): Promise<{ success: boole
                 db.run(
                   'UPDATE access_requests SET status = ? WHERE id = ?',
                   ['approved', id],
-                  function(err) {
+                  function(this: sqlite3.RunResult, err: Error | null) {
                     if (err) {
                       reject(err);
                       return;
@@ -549,7 +549,7 @@ export async function getAllUsers(): Promise<Array<{ id: number; username: strin
     db.all(
       'SELECT id, username, is_admin, created_at FROM users ORDER BY created_at DESC',
       [],
-      (err, rows: Array<{ id: number; username: string; is_admin: number; created_at: string }>) => {
+      (err: Error | null, rows: Array<{ id: number; username: string; is_admin: number; created_at: string }>) => {
         if (err) {
           reject(err);
         } else {
@@ -597,7 +597,7 @@ export async function getUserById(id: number): Promise<{ id: number; username: s
     db.get(
       'SELECT id, username, is_admin, created_at FROM users WHERE id = ?',
       [id],
-      (err, row: { id: number; username: string; is_admin: number; created_at: string } | undefined) => {
+      (err: Error | null, row: { id: number; username: string; is_admin: number; created_at: string } | undefined) => {
         if (err) {
           reject(err);
         } else {
@@ -640,7 +640,7 @@ export async function createUser(username: string, password: string): Promise<nu
       db.run(
         'INSERT INTO users (username, password_hash) VALUES (?, ?)',
         [username, passwordHash],
-        function(err) {
+        function(this: sqlite3.RunResult, err: Error | null) {
           if (err) {
             if (err.message.includes('UNIQUE constraint failed')) {
               resolve(null);
@@ -694,7 +694,7 @@ export async function updateUser(
           db.get(
             'SELECT id FROM users WHERE username = ? AND id != ?',
             [updates.username, id],
-            (err, row) => {
+            (err: Error | null, row: unknown) => {
               if (err) rej(err);
               else res(!!row);
             }
@@ -728,7 +728,7 @@ export async function updateUser(
       params.push(id);
       const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`;
 
-      db.run(query, params, function(err) {
+      db.run(query, params, function(this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else {
@@ -752,7 +752,7 @@ export async function deleteUser(id: number): Promise<boolean> {
     db.run(
       'DELETE FROM users WHERE id = ?',
       [id],
-      function(err) {
+      function(this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else {

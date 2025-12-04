@@ -1180,7 +1180,7 @@ io.on('connection', (socket: Socket) => {
   });
   
   // Handle disconnection
-  socket.on('disconnect', async (reason) => {
+  socket.on('disconnect', async (reason: string) => {
     const user = authenticatedSockets.get(socket.id);
     
     if (user) {
