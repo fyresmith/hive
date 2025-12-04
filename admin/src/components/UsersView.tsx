@@ -1,5 +1,17 @@
 import { useState, useEffect } from 'react';
-import { getUsers, createUser, updateUser, deleteUser, User } from '../api';
+import { 
+  getUsers, 
+  createUser, 
+  updateUser, 
+  deleteUser, 
+  getVaults,
+  getVaultMembers,
+  addVaultMember,
+  updateVaultMemberRole,
+  removeVaultMember,
+  User, 
+  VaultRole
+} from '../api';
 
 interface UserModalProps {
   user: User | null;
@@ -88,7 +100,7 @@ function UserModal({ user, onClose, onSave, isCreating }: UserModalProps) {
               Cancel
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Saving...' : isCreating ? 'Create User' : 'Save Changes'}
+              {saving ? 'Saving...' : isCreating ? 'Create' : 'Save'}
             </button>
           </div>
         </form>
@@ -139,9 +151,277 @@ function DeleteModal({ user, onClose, onConfirm }: DeleteModalProps) {
             Cancel
           </button>
           <button className="btn-danger" onClick={handleDelete} disabled={deleting}>
-            {deleting ? 'Deleting...' : 'Delete User'}
+            {deleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// User Detail View with Vault Permissions
+interface UserDetailViewProps {
+  user: User;
+  onBack: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+interface VaultMembership {
+  vaultId: string;
+  role: VaultRole;
+}
+
+function UserDetailView({ user, onBack, onEdit, onDelete }: UserDetailViewProps) {
+  const [memberships, setMemberships] = useState<VaultMembership[]>([]);
+  const [allVaults, setAllVaults] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddVault, setShowAddVault] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, [user.id]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const vaults = await getVaults();
+      setAllVaults(vaults);
+      
+      const userMemberships: VaultMembership[] = [];
+      for (const vaultId of vaults) {
+        try {
+          const members = await getVaultMembers(vaultId);
+          const userMember = members.find(m => m.user_id === user.id);
+          if (userMember) {
+            userMemberships.push({ vaultId, role: userMember.role });
+          }
+        } catch {
+          // Skip vaults we can't access
+        }
+      }
+      setMemberships(userMemberships);
+    } catch (err) {
+      console.error('Failed to load user data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToVault = async (vaultId: string, role: VaultRole) => {
+    try {
+      setActionLoading(true);
+      await addVaultMember(vaultId, user.id, role);
+      await loadData();
+      setShowAddVault(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to add user to vault');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateRole = async (vaultId: string, newRole: VaultRole) => {
+    try {
+      setActionLoading(true);
+      await updateVaultMemberRole(vaultId, user.id, newRole);
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update role');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveFromVault = async (vaultId: string) => {
+    if (!confirm(`Remove ${user.username} from vault "${vaultId}"?`)) return;
+    
+    try {
+      setActionLoading(true);
+      await removeVaultMember(vaultId, user.id);
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to remove from vault');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const availableVaults = allVaults.filter(v => !memberships.some(m => m.vaultId === v));
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  return (
+    <div className="view-container">
+      <div className="view-header">
+        <button onClick={onBack} className="back-button">← Back</button>
+        <h1>{user.username}</h1>
+        {user.is_admin && <span className="badge admin-badge">Admin</span>}
+      </div>
+
+      <div className="user-detail-card">
+        <div className="user-detail-header">
+          <div className="user-detail-avatar" style={{ backgroundColor: '#3b82f6' }}>
+            {user.username.charAt(0).toUpperCase()}
+          </div>
+          <div className="user-detail-info">
+            <h2>{user.username}</h2>
+            <p className="user-detail-meta">User ID: {user.id} · Created {formatDate(user.created_at)}</p>
+          </div>
+          <div className="user-detail-actions">
+            <button className="btn-secondary" onClick={onEdit}>Edit</button>
+            <button className="btn-danger" onClick={onDelete}>Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="section-header">
+        <h2>Vault Permissions</h2>
+        <button 
+          className="btn-primary"
+          onClick={() => setShowAddVault(true)}
+          disabled={availableVaults.length === 0}
+        >
+          + Add to Vault
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="loading-state">
+          <div className="loading-spinner" />
+          <p>Loading permissions...</p>
+        </div>
+      ) : memberships.length === 0 ? (
+        <div className="empty-state">
+          <span className="empty-icon">🔒</span>
+          <p>No vault access</p>
+          <p className="empty-hint">This user doesn't have access to any vaults</p>
+        </div>
+      ) : (
+        <div className="permissions-list">
+          {memberships.map(membership => (
+            <div key={membership.vaultId} className="permission-row">
+              <div className="permission-vault">
+                <span className="vault-icon">📁</span>
+                <span className="vault-name">{membership.vaultId}</span>
+              </div>
+              <div className="permission-actions">
+                {membership.role === 'owner' ? (
+                  <span className="role-badge owner">Owner</span>
+                ) : (
+                  <>
+                    <select
+                      value={membership.role}
+                      onChange={(e) => handleUpdateRole(membership.vaultId, e.target.value as VaultRole)}
+                      disabled={actionLoading}
+                      className="role-select"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <button
+                      onClick={() => handleRemoveFromVault(membership.vaultId)}
+                      className="btn-icon danger"
+                      title="Remove access"
+                      disabled={actionLoading}
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAddVault && (
+        <AddToVaultModal
+          vaults={availableVaults}
+          onAdd={handleAddToVault}
+          onClose={() => setShowAddVault(false)}
+          loading={actionLoading}
+        />
+      )}
+    </div>
+  );
+}
+
+// Add to Vault Modal
+interface AddToVaultModalProps {
+  vaults: string[];
+  onAdd: (vaultId: string, role: VaultRole) => void;
+  onClose: () => void;
+  loading: boolean;
+}
+
+function AddToVaultModal({ vaults, onAdd, onClose, loading }: AddToVaultModalProps) {
+  const [selectedVault, setSelectedVault] = useState('');
+  const [selectedRole, setSelectedRole] = useState<VaultRole>('editor');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedVault) {
+      onAdd(selectedVault, selectedRole);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Add to Vault</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label>Vault</label>
+              <select
+                value={selectedVault}
+                onChange={(e) => setSelectedVault(e.target.value)}
+                className="form-input"
+                required
+              >
+                <option value="">Select a vault...</option>
+                {vaults.map(vault => (
+                  <option key={vault} value={vault}>{vault}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Role</label>
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value as VaultRole)}
+                className="form-input"
+              >
+                <option value="admin">Admin - Can manage members</option>
+                <option value="editor">Editor - Can read and write</option>
+                <option value="viewer">Viewer - Read only</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={!selectedVault || loading}>
+              {loading ? 'Adding...' : 'Add Access'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -154,6 +434,7 @@ export default function UsersView() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -195,6 +476,7 @@ export default function UsersView() {
   const handleDeleteUser = async () => {
     if (!deletingUser) return;
     await deleteUser(deletingUser.id);
+    setSelectedUser(null);
     await loadUsers();
   };
 
@@ -203,11 +485,24 @@ export default function UsersView() {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     });
   };
+
+  // Show user detail view if a user is selected
+  if (selectedUser) {
+    return (
+      <UserDetailView
+        user={selectedUser}
+        onBack={() => {
+          setSelectedUser(null);
+          loadUsers();
+        }}
+        onEdit={() => setEditingUser(selectedUser)}
+        onDelete={() => setDeletingUser(selectedUser)}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -243,9 +538,8 @@ export default function UsersView() {
         <h1>Users</h1>
         <span className="badge">{users.length}</span>
         <div className="header-actions">
-          <button className="btn-create" onClick={() => setShowCreateModal(true)}>
-            <span className="btn-icon">+</span>
-            Create User
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
+            + Create User
           </button>
         </div>
       </div>
@@ -263,47 +557,53 @@ export default function UsersView() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Username</th>
+                <th>User</th>
                 <th>Created</th>
+                <th>Role</th>
                 <th className="actions-column">Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id}>
-                  <td className="mono">{user.id}</td>
+                <tr 
+                  key={user.id} 
+                  className="clickable-row"
+                  onClick={() => setSelectedUser(user)}
+                >
                   <td>
                     <div className="user-cell">
                       <span className="user-avatar">
                         {user.username.charAt(0).toUpperCase()}
                       </span>
-                      {user.username}
+                      <div className="user-cell-info">
+                        <span className="user-cell-name">{user.username}</span>
+                        <span className="user-cell-id">ID: {user.id}</span>
+                      </div>
                     </div>
                   </td>
                   <td className="muted">{formatDate(user.created_at)}</td>
                   <td>
+                    {user.is_admin ? (
+                      <span className="role-tag admin">Server Admin</span>
+                    ) : (
+                      <span className="role-tag user">User</span>
+                    )}
+                  </td>
+                  <td onClick={e => e.stopPropagation()}>
                     <div className="row-actions">
                       <button 
                         className="action-btn edit" 
                         onClick={() => setEditingUser(user)}
                         title="Edit user"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
+                        ✎
                       </button>
                       <button 
                         className="action-btn delete" 
                         onClick={() => setDeletingUser(user)}
                         title="Delete user"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                          <line x1="10" y1="11" x2="10" y2="17" />
-                          <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
+                        ✕
                       </button>
                     </div>
                   </td>

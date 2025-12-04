@@ -5,7 +5,7 @@
  * Steps: Server URL → Ping → Login/Request Access → Vault Check → Sync
  */
 
-import { App, ItemView, WorkspaceLeaf, Setting, Notice, ButtonComponent, TextComponent, setIcon } from 'obsidian';
+import { App, ItemView, WorkspaceLeaf, Setting, Notice, ButtonComponent, TextComponent, setIcon, requestUrl } from 'obsidian';
 import type HivePlugin from './main';
 
 export const HIVE_SETTINGS_VIEW_TYPE = 'hive-settings-view';
@@ -218,14 +218,15 @@ export class HiveSettingsView extends ItemView {
       }
       normalizedUrl = normalizedUrl.replace(/\/$/, ''); // Remove trailing slash
 
-      const response = await fetch(`${normalizedUrl}/api/health`, {
+      const response = await requestUrl({
+        url: `${normalizedUrl}/api/health`,
         method: 'GET',
         headers: { 'Accept': 'application/json' },
       });
 
-      const data = await response.json();
+      const data = response.json;
 
-      if (response.ok && data.status === 'ok') {
+      if (response.status === 200 && data.status === 'ok') {
         // Success!
         this.state.serverUrl = normalizedUrl;
         this.state.serverVerified = true;
@@ -445,15 +446,16 @@ export class HiveSettingsView extends ItemView {
     statusEl.removeClass('hive-status-error');
 
     try {
-      const response = await fetch(`${this.state.serverUrl}/api/login`, {
+      const response = await requestUrl({
+        url: `${this.state.serverUrl}/api/login`,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await response.json();
+      const data = response.json;
 
-      if (response.ok && data.token) {
+      if (response.status === 200 && data.token) {
         // Save credentials (vault-specific)
         this.state.username = username;
         this.state.token = data.token;
@@ -722,15 +724,16 @@ export class HiveSettingsView extends ItemView {
     statusEl.removeClass('hive-status-error');
 
     try {
-      const response = await fetch(`${this.state.serverUrl}/api/request-login`, {
+      const response = await requestUrl({
+        url: `${this.state.serverUrl}/api/request-login`,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password, message }),
       });
 
-      const data = await response.json();
+      const data = response.json;
 
-      if (response.ok) {
+      if (response.status === 200 || response.status === 201) {
         // Show success message
         if (!this.mainContentEl) return;
         this.mainContentEl.empty();

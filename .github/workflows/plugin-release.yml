@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: plugin
-        run: npm ci
+        run: npm i
 
       - name: Build plugin
         working-directory: plugin

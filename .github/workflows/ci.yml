@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: server
-        run: npm ci
+        run: npm i
 
       - name: Type check
         working-directory: server
@@ -55,7 +55,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: plugin
-        run: npm ci
+        run: npm i
 
       - name: Type check
         working-directory: plugin
@@ -89,7 +89,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: admin
-        run: npm ci
+        run: npm i
 
       - name: Type check
         working-directory: admin

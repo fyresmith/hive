@@ -56,6 +56,7 @@ export async function autoLogin(): Promise<{ token: string; username: string }> 
 export interface User {
   id: number;
   username: string;
+  is_admin: boolean;
   created_at: string;
 }
 
@@ -263,5 +264,42 @@ export async function transferVaultOwnership(vaultId: string, newOwnerId: number
     const data = await res.json();
     throw new Error(data.error || 'Failed to transfer ownership');
   }
+}
+
+// Get all vault memberships (for admin user management)
+export async function getAllVaultMemberships(): Promise<Map<string, VaultMember[]>> {
+  const vaults = await getVaults();
+  const memberships = new Map<string, VaultMember[]>();
+  
+  for (const vaultId of vaults) {
+    try {
+      const members = await getVaultMembers(vaultId);
+      memberships.set(vaultId, members);
+    } catch {
+      // Skip vaults we can't access
+    }
+  }
+  
+  return memberships;
+}
+
+// Get vault memberships for a specific user
+export async function getUserVaultMemberships(userId: number): Promise<Array<{ vaultId: string; role: VaultRole }>> {
+  const vaults = await getVaults();
+  const userMemberships: Array<{ vaultId: string; role: VaultRole }> = [];
+  
+  for (const vaultId of vaults) {
+    try {
+      const members = await getVaultMembers(vaultId);
+      const userMember = members.find(m => m.user_id === userId);
+      if (userMember) {
+        userMemberships.push({ vaultId, role: userMember.role });
+      }
+    } catch {
+      // Skip vaults we can't access
+    }
+  }
+  
+  return userMemberships;
 }
 

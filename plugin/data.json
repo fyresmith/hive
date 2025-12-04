@@ -3,7 +3,7 @@
     "Test": {
       "serverUrl": "http://localhost:3000",
       "username": "coolbeans",
-      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwidXNlcm5hbWUiOiJjb29sYmVhbnMiLCJpYXQiOjE3NjQ4MDY0ODMsImV4cCI6MTc2NTQxMTI4M30.TmpLLF4ZkkFeVR-hqkhmXGEvmntoU18ekV1PbYnCenU",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NiwidXNlcm5hbWUiOiJjb29sYmVhbnMiLCJpc0FkbWluIjpmYWxzZSwiaWF0IjoxNzY0ODE2NDgxLCJleHAiOjE3NjU0MjEyODF9.ogn4d1lCO8C9zXVeSd7JhDK68pgqsW_VHBRsTcb1lNo",
       "vaultId": "my-shared-vault",
       "autoConnect": true,
       "userColor": "#cd7451"

@@ -8,8 +8,9 @@
   "scripts": {
     "dev": "vite",
     "dev:electron": "npm run build:electron && electron .",
-    "build": "tsc && vite build && npm run build:electron",
+    "build": "tsc && vite build && npm run build:electron && npm run build:server",
     "build:electron": "tsc -p tsconfig.electron.json",
+    "build:server": "cd ../server && npm run build && cd ../admin && node scripts/copy-server.js",
     "electron": "electron .",
     "start": "npm run build && electron .",
     "package": "npm run build && electron-builder",
@@ -41,7 +42,18 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "bundled-server/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bundled-server",
+        "to": "server",
+        "filter": ["**/*"]
+      }
+    ],
+    "asarUnpack": [
+      "bundled-server/**/*"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",

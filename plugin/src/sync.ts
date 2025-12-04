@@ -508,11 +508,12 @@ export class SyncEngine extends Events {
           const encoder = encoding.createEncoder();
           encoding.writeVarUint(encoder, MessageType.SYNC);
           
+          // Use 'remote' as origin so handleDocUpdate doesn't echo the update back
           const syncMessageType = syncProtocol.readSyncMessage(
             decoder,
             encoder,
             this.doc,
-            null
+            'remote'
           );
           
           // syncMessageType: 0 = SyncStep1 (state vector), 1 = SyncStep2 (document data), 2 = Update

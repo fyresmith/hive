@@ -283,11 +283,12 @@ async function handleSyncMessage(
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, MessageType.SYNC);
       
+      // Use 'remote' as origin to mark this as a remote update
       const syncMessageType = syncProtocol.readSyncMessage(
         decoder,
         encoder,
         doc,
-        null
+        'remote'
       );
       
       // If we have a response, send it

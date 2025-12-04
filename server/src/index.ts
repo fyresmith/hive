@@ -79,10 +79,11 @@ dotenv.config();
 const PORT = process.env.PORT || 3000;
 
 // Parse allowed origins from environment (comma-separated)
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173')
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(origin => origin.length > 0);
+// If not specified, allow all origins (needed for Obsidian plugin which uses app:// protocol)
+const ALLOWED_ORIGINS_ENV = process.env.ALLOWED_ORIGINS;
+const ALLOWED_ORIGINS: string[] | true = ALLOWED_ORIGINS_ENV
+  ? ALLOWED_ORIGINS_ENV.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0)
+  : true as const; // Allow all origins when not specified
 
 // Optional admin password for admin token endpoint
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -91,10 +92,15 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const app = express();
 const httpServer = createServer(app);
 
+// CORS origin handler - allows all origins when ALLOWED_ORIGINS is true
+const corsOriginHandler = ALLOWED_ORIGINS === true 
+  ? true  // Allow all origins
+  : ALLOWED_ORIGINS;
+
 // Initialize Socket.io with CORS and transport settings
 const io = new Server(httpServer, {
   cors: {
-    origin: ALLOWED_ORIGINS,
+    origin: corsOriginHandler,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -124,9 +130,9 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// CORS configuration
+// CORS configuration - allow all origins when not specified (needed for Obsidian plugin)
 app.use(cors({
-  origin: ALLOWED_ORIGINS,
+  origin: corsOriginHandler,
   credentials: true,
 }));
 
