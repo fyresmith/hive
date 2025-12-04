@@ -1,0 +1,76 @@
+name: Plugin Release
+
+on:
+  push:
+    tags:
+      - 'plugin-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plugin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: plugin
+        run: npm ci
+
+      - name: Build plugin
+        working-directory: plugin
+        run: npm run build
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/plugin-v}" >> $GITHUB_OUTPUT
+
+      - name: Verify manifest version matches tag
+        working-directory: plugin
+        run: |
+          MANIFEST_VERSION=$(jq -r '.version' manifest.json)
+          if [ "$MANIFEST_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "Error: manifest.json version ($MANIFEST_VERSION) doesn't match tag (${{ steps.version.outputs.VERSION }})"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Plugin v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Hive Obsidian Plugin v${{ steps.version.outputs.VERSION }}
+            
+            ### Installation
+            
+            #### Manual Installation
+            1. Download `main.js`, `manifest.json`, and `styles.css`
+            2. Create folder: `<vault>/.obsidian/plugins/collaborative-vault/`
+            3. Copy the downloaded files into that folder
+            4. Enable the plugin in Obsidian Settings → Community Plugins
+            
+            #### BRAT (Beta Reviewers Auto-update Tester)
+            1. Install BRAT from Obsidian Community Plugins
+            2. Add beta plugin: `${{ github.repository }}`
+            3. Enable "Collaborative Vault" in Community Plugins
+            
+            ### Requirements
+            - Obsidian v0.15.0 or higher
+            - A running Hive server
+          files: |
+            plugin/main.js
+            plugin/manifest.json
+            plugin/styles.css
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+

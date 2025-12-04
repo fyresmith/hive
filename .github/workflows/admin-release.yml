@@ -1,0 +1,122 @@
+name: Admin Release
+
+on:
+  push:
+    tags:
+      - 'admin-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: admin
+        run: npm ci
+
+      - name: Build Vite app
+        working-directory: admin
+        run: npm run build
+
+      - name: Build Electron app (macOS)
+        if: matrix.platform == 'mac'
+        working-directory: admin
+        run: npm run package:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Electron app (Linux)
+        if: matrix.platform == 'linux'
+        working-directory: admin
+        run: npm run package:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Electron app (Windows)
+        if: matrix.platform == 'win'
+        working-directory: admin
+        run: npm run package:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.platform }}
+          path: |
+            admin/release/*.dmg
+            admin/release/*.zip
+            admin/release/*.AppImage
+            admin/release/*.deb
+            admin/release/*.exe
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/admin-v}" >> $GITHUB_OUTPUT
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Admin v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Hive Admin v${{ steps.version.outputs.VERSION }}
+            
+            Desktop application for managing your Hive server.
+            
+            ### Downloads
+            
+            | Platform | File |
+            |----------|------|
+            | macOS (Apple Silicon) | `Hive-Admin-*-arm64.dmg` |
+            | macOS (Intel) | `Hive-Admin-*-x64.dmg` |
+            | Windows | `Hive-Admin-*-Setup.exe` |
+            | Linux (AppImage) | `Hive-Admin-*-x86_64.AppImage` |
+            | Linux (Debian/Ubuntu) | `hive-admin_*_amd64.deb` |
+            
+            ### First Run
+            
+            1. Start your Hive server
+            2. Open Hive Admin
+            3. It will automatically connect to `localhost:3000`
+          files: |
+            artifacts/**/*
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+

@@ -1,0 +1,45 @@
+# =============================================================================
+# Hive Monorepo .gitignore
+# =============================================================================
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+*.js.map
+
+# Plugin build output (but keep styles.css which is source)
+plugin/main.js
+
+# Admin release artifacts
+admin/release/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Server data (created at runtime)
+server/data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

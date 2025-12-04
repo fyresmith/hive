@@ -1,0 +1,10 @@
+{
+  "id": "hive-sync",
+  "name": "Hive",
+  "version": "0.1.0",
+  "minAppVersion": "0.15.0",
+  "description": "Real-time collaborative editing for Obsidian vaults - sync your mind with the Hive",
+  "author": "Hive Team",
+  "authorUrl": "https://github.com/hive",
+  "isDesktopOnly": false
+}
